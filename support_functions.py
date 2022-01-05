@@ -9,6 +9,11 @@ import torch.nn.functional as F
 import numpy as np
 from progressbar import progressbar as pb
 
+import os
+import shutil
+import json
+import pickle
+
 """Dataset preporation"""
 
 def read_data(path, parts_num = 1, part = 1):
@@ -494,3 +499,47 @@ def evaluate_score(trainer, eval_dataset = None):
      #   json.dump(data, outfile)
 
     return data
+
+
+# Saving and loading model states
+
+def save_pickle(file, dir):
+    """Saves file to the dir.
+    Dir should not contain extension name.
+    """
+    with open(dir+'.p', 'wb') as fp:
+      pickle.dump(file, fp, protocol=pickle.HIGHEST_PROTOCOL)
+
+
+def load_pickle(dir):
+    with open(dir+'.p', 'rb') as fp:
+        data = pickle.load(fp)
+    return data
+
+def create_folder(dir, overwrite=False):
+    if os.path.exists(dir):
+        if overwrite:
+            shutil.rmtree(dir)
+            os.makedirs(dir)
+    else:
+      os.makedirs(dir)
+
+
+def save_params(params, dir, overwrite=False):
+    """Saves model params to the dir.
+    Dir should not contain file extension.
+    """
+    create_folder(dir, overwrite)
+    params_path = dir + '/model_training_params.json'
+    with open(params_path, 'w') as fp:
+        json.dump(params, fp)
+
+
+def save_model_state(model, path):
+    torch.save(model.state_dict(), path)
+
+def save_mask(mask, dir):
+    torch.save(mask, dir+'.pt')
+
+def load_mask(dir):
+    return torch.load(dir+'.pt')
