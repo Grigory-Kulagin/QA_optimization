@@ -307,58 +307,79 @@ def prepare_and_merge_eval_data(csv_path, tokenizer, text_num=1, parts_num=1, pa
     dataset = TrainDataset(encodings)
     return dataset
 
-"""# Metrics computation"""
+""" Metrics computation"""
 
-#new fanction for f1 calculation
-def return_text_results(bert_results, input_dataset, tokenizer):
-    def select_answer(start_logits, end_logits, id, input_dataset, top_n=20):
-        start_idx_and_logit = sorted(enumerate(start_logits), key=lambda x: x[1], reverse=True)
-        end_idx_and_logit = sorted(enumerate(end_logits), key=lambda x: x[1], reverse=True)
-  
-        tokens = input_dataset.__getitem__(id)['input_ids']
-        sep = tokens.tolist().index(102)
-      
-        prelim_preds = []
-        while not prelim_preds:
-            start_indexes = [idx for idx, logit in start_idx_and_logit[:top_n]]
-            end_indexes = [idx for idx, logit in end_idx_and_logit[:top_n]]
-            for start_index in start_indexes:
-                for end_index in end_indexes:
-                    # throw out invalid predictions
-                    if start_index not in range(1, sep) or end_index not in range(1, sep):
-                      continue
-                    if end_index < start_index:
-                        continue
-                    prelim_preds.append([start_index, end_index, start_logits[start_index] + end_logits[end_index]])
 
-            top_n = top_n * 2
+def select_answer(start_logits, end_logits, tokens, tokenizer, top_n=20):
+    """Selects text answer from model predictions.
 
-        prelim_preds.append([0, 0, start_logits[0] + end_logits[0]])
-        prelim_preds = sorted(prelim_preds, key=lambda x: x[2], reverse=True)
+    Args:
+        start_logits: Logits for start index.
+        end_logits: Logits for end index.
+        tokens: Sentence in form of tokens, that is used for answer extraction.
+        tokenizer: Tokenizer.
+        top_n: Top answer candidates.
 
-        #extract text from tokens  
-        pred_start, pred_finish = prelim_preds[0][:2]
+    Returns:
+        str: Text answer.
 
-        if pred_start == 0:
-            return '', prelim_preds[0][2]
-        else:
-            text = tokenizer.convert_tokens_to_string(
-                tokenizer.convert_ids_to_tokens(
-                    tokens[pred_start:pred_finish+1]
-                )
-            )
+    """
+    start_idx_and_logit = sorted(enumerate(start_logits), key=lambda x: x[1], reverse=True)
+    end_idx_and_logit = sorted(enumerate(end_logits), key=lambda x: x[1], reverse=True)
 
-            return text, prelim_preds[0][2] 
+    #tokens = input_dataset[id]['input_ids']
+    sep_token = tokenizer.sep_token_id
+    sep = tokens.tolist().index(sep_token)
+
+    prelim_preds = []
+    while not prelim_preds:
+        start_indexes = [idx for idx, logit in start_idx_and_logit[:top_n]]
+        end_indexes = [idx for idx, logit in end_idx_and_logit[:top_n]]
+        for start_index in start_indexes:
+            for end_index in end_indexes:
+                # throw out invalid predictions
+                if (start_index < sep) or (end_index < sep) or (end_index < start_index):
+                    continue
+
+                prelim_preds.append([start_index, end_index, start_logits[start_index] + end_logits[end_index]])
+
+        top_n = top_n * 2
+
+    prelim_preds.append([0, 0, start_logits[0] + end_logits[0]])
+    prelim_preds = sorted(prelim_preds, key=lambda x: x[2], reverse=True)
+
+    # extract text from tokens
+    pred_start, pred_finish = prelim_preds[0][:2]
+
+    if pred_start == 0:
+        return ''
+    else:
+        text = tokenizer.convert_tokens_to_string(tokenizer.convert_ids_to_tokens(tokens[pred_start:pred_finish + 1]))
+
+    return text
+
+
+#new function for f1 calculation
+def return_text_results(logits, input_dataset, tokenizer):
+    """Converts pred logits to text answers.
+
+    Args:
+        logits: Model predictions in logits.
+        input_dataset: Torch dataset, that was used for model evaluation.
+        tokenizer: Tokenizer
+
+    Returns:
+        list: Text results.
+
+    """
 
     #beginning of the function implementation
-    start_logits = bert_results.predictions[0]
-    finish_logits = bert_results.predictions[1]
+    start_logits = logits.predictions[0]
+    finish_logits = logits.predictions[1]
 
     text_and_score = []
-    id = 0
-    for start_logit, finish_logit in zip(start_logits, finish_logits):
-        text_and_score.append(select_answer(start_logit, finish_logit, id, input_dataset, top_n=10))
-        id += 1
+    for start_logit, finish_logit, tokens in zip(start_logits, finish_logits, input_dataset):
+        text_and_score.append(select_answer(start_logit, finish_logit, tokens, tokenizer, top_n=10))
     
     return text_and_score
 
@@ -405,16 +426,25 @@ def compute_f1(prediction, truth):
     
     return 2 * (prec * rec) / (prec + rec)
 
-def evaluate_score_squad(trainer, answers, tokenizer, eval_dataset = None):
-    if eval_dataset is None:
-        eval_dataset = trainer.eval_dataset
 
-    predictions = trainer.predict(eval_dataset)
-    pred_texts = return_text_results(predictions, eval_dataset, tokenizer)
+def evaluate_score_squad(pred_logits, eval_dataset_tokens, true_answers, tokenizer):
+    """Evaluates predictions of extractive QA, based on squad script.
+
+    Args:
+        pred_logits: Model predictions in logits.
+        eval_dataset_tokens: The dataset, that was used for model evaluation.
+        true_answers: True text answers.
+        tokenizer: Tokenizer.
+
+    Returns:
+        dict: Evaluation results.
+
+    """
+    #pred_logits = trainer.predict(eval_dataset)
+    pred_texts = return_text_results(pred_logits, eval_dataset_tokens, tokenizer)
 
     f1 = []
-    for pred_text, answer in zip(pred_texts, answers):
-        pred_text = pred_text[0]
+    for pred_text, answer in zip(pred_texts, true_answers):
         if type(answer) != str:
             answer = ''
         f1.append(compute_f1(pred_text, answer))
