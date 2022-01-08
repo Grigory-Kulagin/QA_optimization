@@ -54,6 +54,8 @@ def add_idx(answers: List[dict], contexts: List[str]) -> NoReturn:
         answers: List of span answers
         contexts: List of contexts.
 
+    Examples:
+
     """
     for answer, context in zip(answers, contexts):
         i = 0
@@ -379,6 +381,7 @@ def return_text_results(logits, input_dataset, tokenizer):
 
     text_and_score = []
     for start_logit, finish_logit, tokens in zip(start_logits, finish_logits, input_dataset):
+        tokens = tokens['input_ids']
         text_and_score.append(select_answer(start_logit, finish_logit, tokens, tokenizer, top_n=10))
     
     return text_and_score
@@ -404,8 +407,10 @@ def normalize_text(s):
 
     return white_space_fix(remove_articles(remove_punc(lower(s))))
 
+
 def compute_exact_match(prediction, truth):
     return int(normalize_text(prediction) == normalize_text(truth))
+
 
 def compute_f1(prediction, truth):
     pred_tokens = normalize_text(prediction).split()
@@ -444,12 +449,17 @@ def evaluate_score_squad(pred_logits, eval_dataset_tokens, true_answers, tokeniz
     pred_texts = return_text_results(pred_logits, eval_dataset_tokens, tokenizer)
 
     f1 = []
+    em = []
     for pred_text, answer in zip(pred_texts, true_answers):
         if type(answer) != str:
             answer = ''
         f1.append(compute_f1(pred_text, answer))
+        em.append(compute_exact_match(pred_text, answer))
 
-    return {'f1_mean': np.mean(f1)}
+    return {'f1_mean': np.mean(f1),
+            'em_mean': np.mean(em),
+            'f1': f1,
+            'em': em}
 
 #old functions for metrics calculation
 def compute_f1_f(predict, eval_dataset):
