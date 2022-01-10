@@ -312,7 +312,7 @@ def prepare_and_merge_eval_data(csv_path, tokenizer, text_num=1, parts_num=1, pa
 """ Metrics computation"""
 
 
-def select_answer(start_logits, end_logits, tokens, tokenizer, top_n=20):
+def select_answer(start_logits, end_logits, tokens, tokenizer, top_n=20, return_score=False):
     """Selects text answer from model predictions.
 
     Args:
@@ -323,7 +323,10 @@ def select_answer(start_logits, end_logits, tokens, tokenizer, top_n=20):
         top_n: Top answer candidates.
 
     Returns:
-        str: Text answer.
+        if return_score = True:
+            (text answer, score)
+        else:
+            text answer
 
     """
     start_idx_and_logit = sorted(enumerate(start_logits), key=lambda x: x[1], reverse=True)
@@ -352,17 +355,21 @@ def select_answer(start_logits, end_logits, tokens, tokenizer, top_n=20):
 
     # extract text from tokens
     pred_start, pred_finish = prelim_preds[0][:2]
+    score = prelim_preds[0][2]
 
     if pred_start == 0:
         return ''
     else:
         text = tokenizer.convert_tokens_to_string(tokenizer.convert_ids_to_tokens(tokens[pred_start:pred_finish + 1]))
 
+    if return_score:
+        return text, score
+
     return text
 
 
 #new function for f1 calculation
-def return_text_results(logits, input_dataset, tokenizer):
+def return_text_results(logits, input_dataset, tokenizer, return_score=False):
     """Converts pred logits to text answers.
 
     Args:
@@ -371,7 +378,7 @@ def return_text_results(logits, input_dataset, tokenizer):
         tokenizer: Tokenizer
 
     Returns:
-        list: Text results.
+        list: Text results (+ scores if return_score = True).
 
     """
 
@@ -382,7 +389,7 @@ def return_text_results(logits, input_dataset, tokenizer):
     text_and_score = []
     for start_logit, finish_logit, tokens in zip(start_logits, finish_logits, input_dataset):
         tokens = tokens['input_ids']
-        text_and_score.append(select_answer(start_logit, finish_logit, tokens, tokenizer, top_n=10))
+        text_and_score.append(select_answer(start_logit, finish_logit, tokens, tokenizer, top_n=10, return_score=return_score))
     
     return text_and_score
 
