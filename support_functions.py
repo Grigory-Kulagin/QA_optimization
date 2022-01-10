@@ -358,7 +358,7 @@ def select_answer(start_logits, end_logits, tokens, tokenizer, top_n=20, return_
     score = prelim_preds[0][2]
 
     if pred_start == 0:
-        return ''
+        text = ''
     else:
         text = tokenizer.convert_tokens_to_string(tokenizer.convert_ids_to_tokens(tokens[pred_start:pred_finish + 1]))
 
