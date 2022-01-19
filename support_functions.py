@@ -337,7 +337,7 @@ def select_answer(start_logits, end_logits, tokens, tokenizer, top_n=20, return_
     sep = tokens.tolist().index(sep_token)
 
     prelim_preds = []
-    for _ in range(4):
+    for _ in range(10):
         start_indexes = [idx for idx, logit in start_idx_and_logit[:top_n]]
         end_indexes = [idx for idx, logit in end_idx_and_logit[:top_n]]
         for start_index in start_indexes:
