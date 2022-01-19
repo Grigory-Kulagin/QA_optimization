@@ -337,7 +337,7 @@ def select_answer(start_logits, end_logits, tokens, tokenizer, top_n=20, return_
     sep = tokens.tolist().index(sep_token)
 
     prelim_preds = []
-    while not prelim_preds:
+    for _ in range(4):
         start_indexes = [idx for idx, logit in start_idx_and_logit[:top_n]]
         end_indexes = [idx for idx, logit in end_idx_and_logit[:top_n]]
         for start_index in start_indexes:
@@ -348,6 +348,8 @@ def select_answer(start_logits, end_logits, tokens, tokenizer, top_n=20, return_
 
                 prelim_preds.append([start_index, end_index, start_logits[start_index] + end_logits[end_index]])
 
+        if prelim_preds:
+            break
         top_n = top_n * 2
 
     prelim_preds.append([0, 0, start_logits[0] + end_logits[0]])
