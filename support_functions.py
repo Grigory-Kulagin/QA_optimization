@@ -133,7 +133,7 @@ def prepare_data(csv_path, tokenizer, parts_num = 1, part = 1):
     """
     contexts, questions, answers = read_data(csv_path, parts_num, part)
     add_idx(answers, contexts)
-    encodings = tokenizer(questions, contexts, truncation=True, padding=True)
+    encodings = tokenizer(questions, contexts, truncation=True, padding='max_length')
     add_token_positions(encodings, answers, tokenizer)
     dataset = TrainDataset(encodings)
 
@@ -272,7 +272,7 @@ def prepare_and_merge_data(csv_path, tokenizer, data_type, text_num=1, parts_num
         contexts, questions, answers = read_and_merge_msmarco_data(csv_path, text_num, parts_num, part, text_ids)
 
     add_idx(answers, contexts)
-    encodings = tokenizer(questions, contexts, truncation=True, padding=True)
+    encodings = tokenizer(questions, contexts, truncation=True, padding='max_length')
     add_token_positions(encodings, answers, tokenizer)
     dataset = TrainDataset(encodings)
     if return_answers:
@@ -304,7 +304,7 @@ def prepare_and_merge_eval_data(csv_path, tokenizer, text_num=1, parts_num=1, pa
     contexts, questions, answers = read_and_merge_squad_data(csv_path, text_num, parts_num, part, text_ids)
     answers = [{'text': float('nan')} for i in range(len(answers))]
     add_idx(answers, contexts)
-    encodings = tokenizer(questions, contexts, truncation=True, padding=True)
+    encodings = tokenizer(questions, contexts, truncation=True, padding='max_length')
     add_token_positions(encodings, answers, tokenizer)
     dataset = TrainDataset(encodings)
     return dataset
