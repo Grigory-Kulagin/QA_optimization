@@ -414,7 +414,13 @@ def normalize_text(s):
     def lower(text):
         return text.lower()
 
-    return white_space_fix(remove_articles(remove_punc(lower(s))))
+    def remove_special_symbols(text):
+        symbols = ['(', ')', "'", "-", '’', '<unk>']
+        for s in symbols:
+            text = text.replace(s, ' ')
+        return text
+
+    return white_space_fix(remove_articles(remove_punc(remove_special_symbols(lower(s)))))
 
 
 def compute_exact_match(prediction, truth):
@@ -592,3 +598,6 @@ def save_mask(mask, dir):
 
 def load_mask(dir):
     return torch.load(dir+'.pt')
+
+if __name__ == '__main__':
+    print(normalize_text("Hello, it's my so-work"))
