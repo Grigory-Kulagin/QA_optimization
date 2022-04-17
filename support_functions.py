@@ -312,7 +312,7 @@ def prepare_and_merge_eval_data(csv_path, tokenizer, text_num=1, parts_num=1, pa
 """ Metrics computation"""
 
 
-def select_answer(start_logits, end_logits, tokens, tokenizer, top_n=20, return_score=False):
+def select_answer(start_logits, end_logits, tokens, tokenizer, top_n=20, return_score=False, one_token_coef=None):
     """Selects text answer from model predictions.
 
     Args:
@@ -345,8 +345,10 @@ def select_answer(start_logits, end_logits, tokens, tokenizer, top_n=20, return_
                 # throw out invalid predictions
                 if (start_index < sep) or (end_index < sep) or (end_index < start_index):
                     continue
-
-                prelim_preds.append([start_index, end_index, start_logits[start_index] + end_logits[end_index]])
+                if one_token_coef and ((end_index - start_index) == 1):
+                    prelim_preds.append([start_index, end_index, (start_logits[start_index] + end_logits[end_index]) * one_token_coef])
+                else:
+                    prelim_preds.append([start_index, end_index, start_logits[start_index] + end_logits[end_index]])
 
         if prelim_preds:
             break
@@ -371,7 +373,7 @@ def select_answer(start_logits, end_logits, tokens, tokenizer, top_n=20, return_
 
 
 #new function for f1 calculation
-def return_text_results(logits, input_dataset, tokenizer, return_score=False):
+def return_text_results(logits, input_dataset, tokenizer, return_score=False, one_token_coef=None):
     """Converts pred logits to text answers.
 
     Args:
@@ -391,7 +393,8 @@ def return_text_results(logits, input_dataset, tokenizer, return_score=False):
     text_and_score = []
     for start_logit, finish_logit, tokens in zip(start_logits, finish_logits, input_dataset):
         tokens = tokens['input_ids']
-        text_and_score.append(select_answer(start_logit, finish_logit, tokens, tokenizer, top_n=10, return_score=return_score))
+        text_and_score.append(select_answer(start_logit, finish_logit, tokens, tokenizer, top_n=10, return_score=return_score,
+                                            one_token_coef=one_token_coef))
     
     return text_and_score
 
@@ -447,7 +450,7 @@ def compute_f1(prediction, truth):
     return 2 * (prec * rec) / (prec + rec)
 
 
-def evaluate_score_squad(pred_logits, eval_dataset_tokens, true_answers, tokenizer):
+def evaluate_score_squad(pred_logits, eval_dataset_tokens, true_answers, tokenizer, one_token_coef=None):
     """Evaluates predictions of extractive QA, based on squad script.
 
     Args:
@@ -461,7 +464,7 @@ def evaluate_score_squad(pred_logits, eval_dataset_tokens, true_answers, tokeniz
 
     """
     #pred_logits = trainer.predict(eval_dataset)
-    pred_texts = return_text_results(pred_logits, eval_dataset_tokens, tokenizer)
+    pred_texts = return_text_results(pred_logits, eval_dataset_tokens, tokenizer, one_token_coef=one_token_coef)
 
     f1 = []
     em = []
